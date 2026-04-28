@@ -23,6 +23,8 @@ const (
 	OpenRouterClaude35Haiku  ModelID = "openrouter.claude-3.5-haiku"
 	OpenRouterClaude3Opus    ModelID = "openrouter.claude-3-opus"
 	OpenRouterDeepSeekR1Free ModelID = "openrouter.deepseek-r1-free"
+	OpenRouterKimiK2         ModelID = "openrouter.kimi-k2"
+	OpenRouterKimiK2Free     ModelID = "openrouter.kimi-k2-free"
 	OpenRouterGrok4          ModelID = "openrouter.grok-4"
 )
 
@@ -274,6 +276,29 @@ var OpenRouterModels = map[ModelID]Model{
 		ContextWindow:      163_840,
 		DefaultMaxTokens:   10000,
 	},
+	OpenRouterKimiK2: {
+		ID:                 OpenRouterKimiK2,
+		Name:               "OpenRouter – Kimi K2",
+		Provider:           ProviderOpenRouter,
+		APIModel:           "moonshotai/kimi-k2",
+		CostPer1MIn:        0.57,
+		CostPer1MInCached:  0.57,
+		CostPer1MOut:       2.30,
+		CostPer1MOutCached: 2.30,
+		ContextWindow:      131_072,
+		DefaultMaxTokens:   4096,
+	},
+	OpenRouterKimiK2Free: {
+		ID:                 OpenRouterKimiK2Free,
+		Name:               "OpenRouter – Kimi K2 Free",
+		Provider:           ProviderOpenRouter,
+		APIModel:           "moonshotai/kimi-k2:free",
+		CostPer1MIn:        0,
+		CostPer1MInCached:  0,
+		CostPer1MOut:       0,
+		CostPer1MOutCached: 0,
+		ContextWindow:      131_072,
+		DefaultMaxTokens:   4096,
 	OpenRouterGrok4: {
 		ID:                 OpenRouterGrok4,
 		Name:               "OpenRouter – Grok 4",
