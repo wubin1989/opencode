@@ -1,7 +1,13 @@
-> [!NOTE]  
-> This is the original OpenCode repository, now continuing at [Charm](https://github.com/charmbracelet) with its original creator, [Kujtim Hoxha](https://github.com/kujtimiihoxha).  
-> Development is continuing under a new name as we prepare for a public relaunch.  
-> Follow [@charmcli](https://x.com/charmcli) or join our [Discord](https://charm.sh/chat) for updates.
+# Archived: Project has Moved
+
+This repository is no longer maintained and has been archived for provenance.
+
+The project has continued under the name [Crush][crush], developed by the original author and the Charm team.
+
+Please follow [Crush][crush] for ongoing development.
+
+[crush]: https://github.com/charmbracelet/crush
+
 
 # ⌬ OpenCode
 
@@ -23,7 +29,7 @@ OpenCode is a Go-based CLI application that brings AI assistance to your termina
 ## Features
 
 - **Interactive TUI**: Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) for a smooth terminal experience
-- **Multiple AI Providers**: Support for OpenAI, Anthropic Claude, Google Gemini, AWS Bedrock, Groq, Azure OpenAI, and OpenRouter
+- **Multiple AI Providers**: Support for OpenAI, Anthropic Claude, Google Gemini, Amazon Bedrock, Groq, Azure OpenAI, and OpenRouter
 - **Session Management**: Save and manage multiple conversation sessions
 - **Tool Integration**: AI can execute commands, search files, and modify code
 - **Vim-like Editor**: Integrated editor with text input capabilities
@@ -105,9 +111,9 @@ You can configure OpenCode using environment variables:
 | `VERTEXAI_PROJECT`         | For Google Cloud VertexAI (Gemini)                                               |
 | `VERTEXAI_LOCATION`        | For Google Cloud VertexAI (Gemini)                                               |
 | `GROQ_API_KEY`             | For Groq models                                                                  |
-| `AWS_ACCESS_KEY_ID`        | For AWS Bedrock (Claude)                                                         |
-| `AWS_SECRET_ACCESS_KEY`    | For AWS Bedrock (Claude)                                                         |
-| `AWS_REGION`               | For AWS Bedrock (Claude)                                                         |
+| `AWS_ACCESS_KEY_ID`        | For Amazon Bedrock (Claude)                                                         |
+| `AWS_SECRET_ACCESS_KEY`    | For Amazon Bedrock (Claude)                                                         |
+| `AWS_REGION`               | For Amazon Bedrock (Claude)                                                         |
 | `AZURE_OPENAI_ENDPOINT`    | For Azure OpenAI models                                                          |
 | `AZURE_OPENAI_API_KEY`     | For Azure OpenAI models (optional when using Entra ID)                           |
 | `AZURE_OPENAI_API_VERSION` | For Azure OpenAI models                                                          |
@@ -155,6 +161,10 @@ This is useful if you want to use a different shell than your default system she
       "disabled": false
     },
     "openrouter": {
+      "apiKey": "your-api-key",
+      "disabled": false
+    },
+    "xai": {
       "apiKey": "your-api-key",
       "disabled": false
     }
@@ -244,7 +254,7 @@ OpenCode supports a variety of AI models from different providers:
 - Gemini 2.0 Flash
 - Gemini 2.0 Flash Lite
 
-### AWS Bedrock
+### Amazon Bedrock
 
 - Claude 3.7 Sonnet
 
@@ -269,6 +279,14 @@ OpenCode supports a variety of AI models from different providers:
 
 - Gemini 2.5
 - Gemini 2.5 Flash
+
+### XAI
+
+- Grok 3 Beta
+- Grok 3 Mini Beta
+- Grok 3 Fast Beta
+- Grok 3 Mini Fast Beta
+- Grok 4 0709
 
 ## Usage
 
@@ -524,6 +542,34 @@ OpenCode includes several built-in commands:
 
 OpenCode implements the Model Context Protocol (MCP) to extend its capabilities through external tools. MCP provides a standardized way for the AI assistant to interact with external services and tools.
 
+### Spec Driven Development
+
+OpenCode supports Spec Driven Development through the `spec-server`, an MCP server that guides the user through a three-phase workflow:
+
+1.  **Requirements:** Define user stories and acceptance criteria.
+2.  **Design:** Create a technical design document.
+3.  **Tasks:** Generate actionable implementation tasks.
+
+To use the `spec-server`, you first need to install it:
+
+```bash
+pip install spec-server
+```
+
+Then, you need to add it to your `.opencode.json` configuration file:
+
+```json
+{
+  "mcpServers": {
+    "spec-server": {
+      "command": "spec-server",
+      "args": ["stdio"],
+      "disabled": false
+    }
+  }
+}
+```
+
 ### MCP Features
 
 - **External Tool Integration**: Connect to external tools and services via a standardized protocol
@@ -626,11 +672,16 @@ This is useful for developers who want to experiment with custom models.
 
 ### Configuring a self-hosted provider
 
-You can use a self-hosted model by setting the `LOCAL_ENDPOINT` environment variable.
+You can use a self-hosted model by setting one of the following environment variables:
+
+- `OLLAMA_ENDPOINT`: For Ollama models
+- `LMSTUDIO_ENDPOINT`: For LMStudio models
+- `LOCAL_ENDPOINT`: For other local models
+
 This will cause OpenCode to load and use the models from the specified endpoint.
 
 ```bash
-LOCAL_ENDPOINT=http://localhost:1235/v1
+OLLAMA_ENDPOINT=http://localhost:11434
 ```
 
 ### Configuring a self-hosted model
@@ -641,7 +692,7 @@ You can also configure a self-hosted model in the configuration file under the `
 {
   "agents": {
     "coder": {
-      "model": "local.granite-3.3-2b-instruct@q8_0",
+      "model": "local/Ollama/llama2",
       "reasoningEffort": "high"
     }
   }

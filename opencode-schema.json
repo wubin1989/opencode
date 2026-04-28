@@ -62,10 +62,13 @@
             "azure.o1-mini",
             "openrouter.claude-3.7-sonnet",
             "openrouter.gpt-4.5-preview",
+            "openrouter.grok-4",
             "grok-3-mini-beta",
             "claude-3.7-sonnet",
             "gemini-2.0-flash",
             "openrouter.deepseek-r1-free",
+            "openrouter.kimi-k2",
+            "openrouter.kimi-k2-free",
             "vertexai.gemini-2.5-flash",
             "vertexai.gemini-2.5",
             "o1-pro",
@@ -88,7 +91,8 @@
             "copilot.o3-mini",
             "copilot.o4-mini",
             "copilot.gemini-2.0-flash",
-            "copilot.gemini-2.5-pro"
+            "copilot.gemini-2.5-pro",
+            "moonshotai/kimi-k2-instruct"
           ],
           "type": "string"
         },
@@ -172,10 +176,14 @@
               "azure.o1-mini",
               "openrouter.claude-3.7-sonnet",
               "openrouter.gpt-4.5-preview",
+              "openrouter.grok-4",
               "grok-3-mini-beta",
+              "grok-4-0709",
               "claude-3.7-sonnet",
               "gemini-2.0-flash",
               "openrouter.deepseek-r1-free",
+              "openrouter.kimi-k2",
+              "openrouter.kimi-k2-free",
               "vertexai.gemini-2.5-flash",
               "vertexai.gemini-2.5",
               "o1-pro",
@@ -198,7 +206,8 @@
               "copilot.o3-mini",
               "copilot.o4-mini",
               "copilot.gemini-2.0-flash",
-              "copilot.gemini-2.5-pro"
+              "copilot.gemini-2.5-pro",
+              "moonshotai/kimi-k2-instruct"
             ],
             "type": "string"
           },

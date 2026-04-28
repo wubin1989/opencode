@@ -25,6 +25,9 @@ const (
 	OpenRouterClaude4Sonnet  ModelID = "openrouter.claude-sonnet-4"
 	OpenRouterClaude4Opus    ModelID = "openrouter.claude-opus-4"
 	OpenRouterDeepSeekR1Free ModelID = "openrouter.deepseek-r1-free"
+	OpenRouterKimiK2         ModelID = "openrouter.kimi-k2"
+	OpenRouterKimiK2Free     ModelID = "openrouter.kimi-k2-free"
+	OpenRouterGrok4          ModelID = "openrouter.grok-4"
 )
 
 var OpenRouterModels = map[ModelID]Model{
@@ -302,5 +305,40 @@ var OpenRouterModels = map[ModelID]Model{
 		DefaultMaxTokens:    AnthropicModels[Claude4Opus].DefaultMaxTokens,
 		CanReason:           true,
 		SupportsAttachments: AnthropicModels[Claude4Opus].SupportsAttachments,
+	OpenRouterKimiK2: {
+		ID:                 OpenRouterKimiK2,
+		Name:               "OpenRouter – Kimi K2",
+		Provider:           ProviderOpenRouter,
+		APIModel:           "moonshotai/kimi-k2",
+		CostPer1MIn:        0.57,
+		CostPer1MInCached:  0.57,
+		CostPer1MOut:       2.30,
+		CostPer1MOutCached: 2.30,
+		ContextWindow:      131_072,
+		DefaultMaxTokens:   4096,
+	},
+	OpenRouterKimiK2Free: {
+		ID:                 OpenRouterKimiK2Free,
+		Name:               "OpenRouter – Kimi K2 Free",
+		Provider:           ProviderOpenRouter,
+		APIModel:           "moonshotai/kimi-k2:free",
+		CostPer1MIn:        0,
+		CostPer1MInCached:  0,
+		CostPer1MOut:       0,
+		CostPer1MOutCached: 0,
+		ContextWindow:      131_072,
+		DefaultMaxTokens:   4096,
+	OpenRouterGrok4: {
+		ID:                 OpenRouterGrok4,
+		Name:               "OpenRouter – Grok 4",
+		Provider:           ProviderOpenRouter,
+		APIModel:           "x-ai/grok-4",
+		CostPer1MIn:        3.0,
+		CostPer1MInCached:  0.75,
+		CostPer1MOut:       15.0,
+		CostPer1MOutCached: 0,
+		ContextWindow:      256_000,
+		DefaultMaxTokens:   16_000,
+		CanReason:          true,
 	},
 }
