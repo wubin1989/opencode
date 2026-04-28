@@ -178,6 +178,7 @@
               "openrouter.gpt-4.5-preview",
               "openrouter.grok-4",
               "grok-3-mini-beta",
+              "grok-4-0709",
               "claude-3.7-sonnet",
               "gemini-2.0-flash",
               "openrouter.deepseek-r1-free",
