@@ -10,6 +10,8 @@ import (
 
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/opencode-ai/opencode/internal/config"
 )
 
 func TestLsTool_Info(t *testing.T) {
@@ -29,6 +31,10 @@ func TestLsTool_Run(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "ls_tool_test")
 	assert.NoError(t, err)
 	defer os.RemoveAll(tempDir)
+	
+	// Load config with the temp directory as working directory
+	_, err = config.Load(tempDir, false)
+	require.NoError(t, err)
 
 	// Create a test directory structure
 	testDirs := []string{
@@ -198,7 +204,7 @@ func TestLsTool_Run(t *testing.T) {
 		
 		tool := NewLsTool()
 		params := LSParams{
-			Path: filepath.Base(tempDir),
+			Path: "testsubdir", // Relative to the config's working directory (tempDir)
 		}
 
 		paramsJSON, err := json.Marshal(params)
@@ -212,9 +218,8 @@ func TestLsTool_Run(t *testing.T) {
 		response, err := tool.Run(context.Background(), call)
 		assert.NoError(t, err)
 		
-		// Should list the temp directory contents
-		assert.Contains(t, response.Content, "dir1")
-		assert.Contains(t, response.Content, "file1.txt")
+		// Should list the subdirectory contents
+		assert.Contains(t, response.Content, "testfile.txt")
 	})
 }
 
