@@ -25,6 +25,7 @@ const (
 	OpenRouterDeepSeekR1Free ModelID = "openrouter.deepseek-r1-free"
 	OpenRouterKimiK2         ModelID = "openrouter.kimi-k2"
 	OpenRouterKimiK2Free     ModelID = "openrouter.kimi-k2-free"
+	OpenRouterGrok4          ModelID = "openrouter.grok-4"
 )
 
 var OpenRouterModels = map[ModelID]Model{
@@ -298,5 +299,17 @@ var OpenRouterModels = map[ModelID]Model{
 		CostPer1MOutCached: 0,
 		ContextWindow:      131_072,
 		DefaultMaxTokens:   4096,
+	OpenRouterGrok4: {
+		ID:                 OpenRouterGrok4,
+		Name:               "OpenRouter – Grok 4",
+		Provider:           ProviderOpenRouter,
+		APIModel:           "x-ai/grok-4",
+		CostPer1MIn:        3.0,
+		CostPer1MInCached:  0.75,
+		CostPer1MOut:       15.0,
+		CostPer1MOutCached: 0,
+		ContextWindow:      256_000,
+		DefaultMaxTokens:   16_000,
+		CanReason:          true,
 	},
 }

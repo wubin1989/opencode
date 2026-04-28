@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"time"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
-	"github.com/openai/openai-go/shared"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/llm/models"
 	"github.com/opencode-ai/opencode/internal/llm/tools"
@@ -18,56 +18,54 @@ import (
 	"github.com/opencode-ai/opencode/internal/message"
 )
 
-type openaiOptions struct {
-	baseURL         string
-	disableCache    bool
-	reasoningEffort string
-	extraHeaders    map[string]string
+type deepSeekOptions struct {
+	baseURL      string
+	extraHeaders map[string]string
 }
 
-type OpenAIOption func(*openaiOptions)
+type DeepSeekOption func(*deepSeekOptions)
 
-type openaiClient struct {
+type deepSeekClient struct {
 	providerOptions providerClientOptions
-	options         openaiOptions
+	options         deepSeekOptions
 	client          openai.Client
 }
 
-type OpenAIClient ProviderClient
+type DeepSeekClient ProviderClient
 
-func newOpenAIClient(opts providerClientOptions) OpenAIClient {
-	openaiOpts := openaiOptions{
-		reasoningEffort: "medium",
+func newDeepSeekClient(opts providerClientOptions) DeepSeekClient {
+	deepSeekOpts := deepSeekOptions{
+		baseURL: "https://api.deepseek.com/v1",
 	}
-	for _, o := range opts.openaiOptions {
-		o(&openaiOpts)
+	for _, o := range opts.deepSeekOptions {
+		o(&deepSeekOpts)
 	}
 
-	openaiClientOptions := []option.RequestOption{}
+	clientOptions := []option.RequestOption{}
 	if opts.apiKey != "" {
-		openaiClientOptions = append(openaiClientOptions, option.WithAPIKey(opts.apiKey))
+		clientOptions = append(clientOptions, option.WithAPIKey(opts.apiKey))
 	}
-	if openaiOpts.baseURL != "" {
-		openaiClientOptions = append(openaiClientOptions, option.WithBaseURL(openaiOpts.baseURL))
+	if deepSeekOpts.baseURL != "" {
+		clientOptions = append(clientOptions, option.WithBaseURL(deepSeekOpts.baseURL))
 	}
 
-	if openaiOpts.extraHeaders != nil {
-		for key, value := range openaiOpts.extraHeaders {
-			openaiClientOptions = append(openaiClientOptions, option.WithHeader(key, value))
+	if deepSeekOpts.extraHeaders != nil {
+		for key, value := range deepSeekOpts.extraHeaders {
+			clientOptions = append(clientOptions, option.WithHeader(key, value))
 		}
 	}
 
-	client := openai.NewClient(openaiClientOptions...)
-	return &openaiClient{
+	client := openai.NewClient(clientOptions...)
+	return &deepSeekClient{
 		providerOptions: opts,
-		options:         openaiOpts,
+		options:         deepSeekOpts,
 		client:          client,
 	}
 }
 
-func (o *openaiClient) convertMessages(messages []message.Message) (openaiMessages []openai.ChatCompletionMessageParamUnion) {
+func (d *deepSeekClient) convertMessages(messages []message.Message) (deepSeekMessages []openai.ChatCompletionMessageParamUnion) {
 	// Add system message first
-	openaiMessages = append(openaiMessages, openai.SystemMessage(o.providerOptions.systemMessage))
+	deepSeekMessages = append(deepSeekMessages, openai.SystemMessage(d.providerOptions.systemMessage))
 
 	for _, msg := range messages {
 		switch msg.Role {
@@ -76,13 +74,11 @@ func (o *openaiClient) convertMessages(messages []message.Message) (openaiMessag
 			textBlock := openai.ChatCompletionContentPartTextParam{Text: msg.Content().String()}
 			content = append(content, openai.ChatCompletionContentPartUnionParam{OfText: &textBlock})
 			for _, binaryContent := range msg.BinaryContent() {
-				imageURL := openai.ChatCompletionContentPartImageImageURLParam{URL: binaryContent.String(models.ProviderOpenAI)}
+				imageURL := openai.ChatCompletionContentPartImageImageURLParam{URL: binaryContent.String(models.ProviderDeepSeek)}
 				imageBlock := openai.ChatCompletionContentPartImageParam{ImageURL: imageURL}
-
 				content = append(content, openai.ChatCompletionContentPartUnionParam{OfImageURL: &imageBlock})
 			}
-
-			openaiMessages = append(openaiMessages, openai.UserMessage(content))
+			deepSeekMessages = append(deepSeekMessages, openai.UserMessage(content))
 
 		case message.Assistant:
 			assistantMsg := openai.ChatCompletionAssistantMessageParam{
@@ -109,13 +105,13 @@ func (o *openaiClient) convertMessages(messages []message.Message) (openaiMessag
 				}
 			}
 
-			openaiMessages = append(openaiMessages, openai.ChatCompletionMessageParamUnion{
+			deepSeekMessages = append(deepSeekMessages, openai.ChatCompletionMessageParamUnion{
 				OfAssistant: &assistantMsg,
 			})
 
 		case message.Tool:
 			for _, result := range msg.ToolResults() {
-				openaiMessages = append(openaiMessages,
+				deepSeekMessages = append(deepSeekMessages,
 					openai.ToolMessage(result.Content, result.ToolCallID),
 				)
 			}
@@ -125,12 +121,19 @@ func (o *openaiClient) convertMessages(messages []message.Message) (openaiMessag
 	return
 }
 
-func (o *openaiClient) convertTools(tools []tools.BaseTool) []openai.ChatCompletionToolParam {
-	openaiTools := make([]openai.ChatCompletionToolParam, len(tools))
+// DeepSeek-specific tool conversion that handles empty tools properly
+func (d *deepSeekClient) convertTools(tools []tools.BaseTool) []openai.ChatCompletionToolParam {
+	// DeepSeek API doesn't accept empty tools array - return nil instead
+	if len(tools) == 0 {
+		return nil
+	}
+
+	deepSeekTools := make([]openai.ChatCompletionToolParam, len(tools))
 
 	for i, tool := range tools {
 		info := tool.Info()
-		openaiTools[i] = openai.ChatCompletionToolParam{
+		deepSeekTools[i] = openai.ChatCompletionToolParam{
+			Type: "function",
 			Function: openai.FunctionDefinitionParam{
 				Name:        info.Name,
 				Description: openai.String(info.Description),
@@ -143,10 +146,10 @@ func (o *openaiClient) convertTools(tools []tools.BaseTool) []openai.ChatComplet
 		}
 	}
 
-	return openaiTools
+	return deepSeekTools
 }
 
-func (o *openaiClient) finishReason(reason string) message.FinishReason {
+func (d *deepSeekClient) finishReason(reason string) message.FinishReason {
 	switch reason {
 	case "stop":
 		return message.FinishReasonEndTurn
@@ -159,54 +162,42 @@ func (o *openaiClient) finishReason(reason string) message.FinishReason {
 	}
 }
 
-func (o *openaiClient) preparedParams(messages []openai.ChatCompletionMessageParamUnion, tools []openai.ChatCompletionToolParam) openai.ChatCompletionNewParams {
+func (d *deepSeekClient) preparedParams(messages []openai.ChatCompletionMessageParamUnion, tools []openai.ChatCompletionToolParam) openai.ChatCompletionNewParams {
 	params := openai.ChatCompletionNewParams{
-		Model:    openai.ChatModel(o.providerOptions.model.APIModel),
-		Messages: messages,
-		Tools:    tools,
+		Model:     openai.ChatModel(d.providerOptions.model.APIModel),
+		Messages:  messages,
+		MaxTokens: openai.Int(d.providerOptions.maxTokens),
 	}
 
-	if o.providerOptions.model.CanReason == true {
-		params.MaxCompletionTokens = openai.Int(o.providerOptions.maxTokens)
-		switch o.options.reasoningEffort {
-		case "low":
-			params.ReasoningEffort = shared.ReasoningEffortLow
-		case "medium":
-			params.ReasoningEffort = shared.ReasoningEffortMedium
-		case "high":
-			params.ReasoningEffort = shared.ReasoningEffortHigh
-		default:
-			params.ReasoningEffort = shared.ReasoningEffortMedium
-		}
-	} else {
-		params.MaxTokens = openai.Int(o.providerOptions.maxTokens)
+	// Only add tools if they exist (DeepSeek doesn't like empty tools array)
+	if len(tools) > 0 {
+		params.Tools = tools
 	}
 
 	return params
 }
 
-func (o *openaiClient) send(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (response *ProviderResponse, err error) {
-	params := o.preparedParams(o.convertMessages(messages), o.convertTools(tools))
+func (d *deepSeekClient) send(ctx context.Context, messages []message.Message, tools []tools.BaseTool) (response *ProviderResponse, err error) {
+	params := d.preparedParams(d.convertMessages(messages), d.convertTools(tools))
 	cfg := config.Get()
 	if cfg.Debug {
 		jsonData, _ := json.Marshal(params)
-		logging.Debug("Prepared messages", "messages", string(jsonData))
+		logging.Debug("DeepSeek prepared messages", "messages", string(jsonData))
 	}
+
 	attempts := 0
 	for {
 		attempts++
-		openaiResponse, err := o.client.Chat.Completions.New(
-			ctx,
-			params,
-		)
+		deepSeekResponse, err := d.client.Chat.Completions.New(ctx, params)
+		
 		// If there is an error we are going to see if we can retry the call
 		if err != nil {
-			retry, after, retryErr := o.shouldRetry(attempts, err)
+			retry, after, retryErr := d.shouldRetry(attempts, err)
 			if retryErr != nil {
 				return nil, retryErr
 			}
 			if retry {
-				logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, maxRetries), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+				logging.WarnPersist(fmt.Sprintf("DeepSeek: Retrying due to rate limit... attempt %d of %d", attempts, maxRetries), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 				select {
 				case <-ctx.Done():
 					return nil, ctx.Err()
@@ -214,16 +205,16 @@ func (o *openaiClient) send(ctx context.Context, messages []message.Message, too
 					continue
 				}
 			}
-			return nil, err
+			return nil, retryErr
 		}
 
 		content := ""
-		if openaiResponse.Choices[0].Message.Content != "" {
-			content = openaiResponse.Choices[0].Message.Content
+		if deepSeekResponse.Choices[0].Message.Content != "" {
+			content = deepSeekResponse.Choices[0].Message.Content
 		}
 
-		toolCalls := o.toolCalls(*openaiResponse)
-		finishReason := o.finishReason(string(openaiResponse.Choices[0].FinishReason))
+		toolCalls := d.toolCalls(*deepSeekResponse)
+		finishReason := d.finishReason(string(deepSeekResponse.Choices[0].FinishReason))
 
 		if len(toolCalls) > 0 {
 			finishReason = message.FinishReasonToolUse
@@ -232,14 +223,14 @@ func (o *openaiClient) send(ctx context.Context, messages []message.Message, too
 		return &ProviderResponse{
 			Content:      content,
 			ToolCalls:    toolCalls,
-			Usage:        o.usage(*openaiResponse),
+			Usage:        d.usage(*deepSeekResponse),
 			FinishReason: finishReason,
 		}, nil
 	}
 }
 
-func (o *openaiClient) stream(ctx context.Context, messages []message.Message, tools []tools.BaseTool) <-chan ProviderEvent {
-	params := o.preparedParams(o.convertMessages(messages), o.convertTools(tools))
+func (d *deepSeekClient) stream(ctx context.Context, messages []message.Message, tools []tools.BaseTool) <-chan ProviderEvent {
+	params := d.preparedParams(d.convertMessages(messages), d.convertTools(tools))
 	params.StreamOptions = openai.ChatCompletionStreamOptionsParam{
 		IncludeUsage: openai.Bool(true),
 	}
@@ -247,7 +238,7 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 	cfg := config.Get()
 	if cfg.Debug {
 		jsonData, _ := json.Marshal(params)
-		logging.Debug("Prepared messages", "messages", string(jsonData))
+		logging.Debug("DeepSeek prepared messages", "messages", string(jsonData))
 	}
 
 	attempts := 0
@@ -256,17 +247,14 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 	go func() {
 		for {
 			attempts++
-			openaiStream := o.client.Chat.Completions.NewStreaming(
-				ctx,
-				params,
-			)
+			deepSeekStream := d.client.Chat.Completions.NewStreaming(ctx, params)
 
 			acc := openai.ChatCompletionAccumulator{}
 			currentContent := ""
 			toolCalls := make([]message.ToolCall, 0)
 
-			for openaiStream.Next() {
-				chunk := openaiStream.Current()
+			for deepSeekStream.Next() {
+				chunk := deepSeekStream.Current()
 				acc.AddChunk(chunk)
 
 				for _, choice := range chunk.Choices {
@@ -280,12 +268,12 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 				}
 			}
 
-			err := openaiStream.Err()
+			err := deepSeekStream.Err()
 			if err == nil || errors.Is(err, io.EOF) {
 				// Stream completed successfully
-				finishReason := o.finishReason(string(acc.ChatCompletion.Choices[0].FinishReason))
+				finishReason := d.finishReason(string(acc.ChatCompletion.Choices[0].FinishReason))
 				if len(acc.ChatCompletion.Choices[0].Message.ToolCalls) > 0 {
-					toolCalls = append(toolCalls, o.toolCalls(acc.ChatCompletion)...)
+					toolCalls = append(toolCalls, d.toolCalls(acc.ChatCompletion)...)
 				}
 				if len(toolCalls) > 0 {
 					finishReason = message.FinishReasonToolUse
@@ -296,7 +284,7 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 					Response: &ProviderResponse{
 						Content:      currentContent,
 						ToolCalls:    toolCalls,
-						Usage:        o.usage(acc.ChatCompletion),
+						Usage:        d.usage(acc.ChatCompletion),
 						FinishReason: finishReason,
 					},
 				}
@@ -305,18 +293,17 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 			}
 
 			// If there is an error we are going to see if we can retry the call
-			retry, after, retryErr := o.shouldRetry(attempts, err)
+			retry, after, retryErr := d.shouldRetry(attempts, err)
 			if retryErr != nil {
 				eventChan <- ProviderEvent{Type: EventError, Error: retryErr}
 				close(eventChan)
 				return
 			}
 			if retry {
-				logging.WarnPersist(fmt.Sprintf("Retrying due to rate limit... attempt %d of %d", attempts, maxRetries), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
+				logging.WarnPersist(fmt.Sprintf("DeepSeek: Retrying due to rate limit... attempt %d of %d", attempts, maxRetries), logging.PersistTimeArg, time.Millisecond*time.Duration(after+100))
 				select {
 				case <-ctx.Done():
-					// context cancelled
-					if ctx.Err() == nil {
+					if ctx.Err() != nil {
 						eventChan <- ProviderEvent{Type: EventError, Error: ctx.Err()}
 					}
 					close(eventChan)
@@ -334,18 +321,19 @@ func (o *openaiClient) stream(ctx context.Context, messages []message.Message, t
 	return eventChan
 }
 
-func (o *openaiClient) shouldRetry(attempts int, err error) (bool, int64, error) {
+func (d *deepSeekClient) shouldRetry(attempts int, err error) (bool, int64, error) {
 	var apierr *openai.Error
 	if !errors.As(err, &apierr) {
 		return false, 0, err
 	}
 
-	if apierr.StatusCode != 429 && apierr.StatusCode != 500 {
+	// DeepSeek specific retry logic
+	if apierr.StatusCode != http.StatusTooManyRequests && apierr.StatusCode != http.StatusInternalServerError {
 		return false, 0, err
 	}
 
 	if attempts > maxRetries {
-		return false, 0, fmt.Errorf("maximum retry attempts reached for rate limit: %d retries", maxRetries)
+		return false, 0, fmt.Errorf("DeepSeek: maximum retry attempts reached: %d retries", maxRetries)
 	}
 
 	retryMs := 0
@@ -362,7 +350,7 @@ func (o *openaiClient) shouldRetry(attempts int, err error) (bool, int64, error)
 	return true, int64(retryMs), nil
 }
 
-func (o *openaiClient) toolCalls(completion openai.ChatCompletion) []message.ToolCall {
+func (d *deepSeekClient) toolCalls(completion openai.ChatCompletion) []message.ToolCall {
 	var toolCalls []message.ToolCall
 
 	if len(completion.Choices) > 0 && len(completion.Choices[0].Message.ToolCalls) > 0 {
@@ -381,45 +369,29 @@ func (o *openaiClient) toolCalls(completion openai.ChatCompletion) []message.Too
 	return toolCalls
 }
 
-func (o *openaiClient) usage(completion openai.ChatCompletion) TokenUsage {
-	cachedTokens := completion.Usage.PromptTokensDetails.CachedTokens
-	inputTokens := completion.Usage.PromptTokens - cachedTokens
+func (d *deepSeekClient) usage(completion openai.ChatCompletion) TokenUsage {
+	cachedTokens := int64(0)
+	if completion.Usage.PromptTokensDetails.CachedTokens != 0 {
+		cachedTokens = int64(completion.Usage.PromptTokensDetails.CachedTokens)
+	}
+	inputTokens := int64(completion.Usage.PromptTokens) - cachedTokens
 
 	return TokenUsage{
 		InputTokens:         inputTokens,
-		OutputTokens:        completion.Usage.CompletionTokens,
-		CacheCreationTokens: 0, // OpenAI doesn't provide this directly
+		OutputTokens:        int64(completion.Usage.CompletionTokens),
+		CacheCreationTokens: 0,
 		CacheReadTokens:     cachedTokens,
 	}
 }
 
-func WithOpenAIBaseURL(baseURL string) OpenAIOption {
-	return func(options *openaiOptions) {
+func WithDeepSeekBaseURL(baseURL string) DeepSeekOption {
+	return func(options *deepSeekOptions) {
 		options.baseURL = baseURL
 	}
 }
 
-func WithOpenAIExtraHeaders(headers map[string]string) OpenAIOption {
-	return func(options *openaiOptions) {
+func WithDeepSeekExtraHeaders(headers map[string]string) DeepSeekOption {
+	return func(options *deepSeekOptions) {
 		options.extraHeaders = headers
-	}
-}
-
-func WithOpenAIDisableCache() OpenAIOption {
-	return func(options *openaiOptions) {
-		options.disableCache = true
-	}
-}
-
-func WithReasoningEffort(effort string) OpenAIOption {
-	return func(options *openaiOptions) {
-		defaultReasoningEffort := "medium"
-		switch effort {
-		case "low", "medium", "high":
-			defaultReasoningEffort = effort
-		default:
-			logging.Warn("Invalid reasoning effort, using default: medium")
-		}
-		options.reasoningEffort = defaultReasoningEffort
 	}
 }
