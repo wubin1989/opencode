@@ -18,6 +18,7 @@ import (
 	"github.com/opencode-ai/opencode/internal/logging"
 	"github.com/opencode-ai/opencode/internal/pubsub"
 	"github.com/opencode-ai/opencode/internal/tui"
+	"github.com/opencode-ai/opencode/internal/tui/util"
 	"github.com/opencode-ai/opencode/internal/version"
 	"github.com/spf13/cobra"
 )
@@ -125,6 +126,14 @@ to assist developers in writing, debugging, and understanding code directly from
 
 		// Setup the subscriptions, this will send services events to the TUI
 		ch, cancelSubs := setupSubscriptions(app, ctx)
+
+		// Start focus tracking
+		focusTracker := util.NewFocusTracker(program)
+		if err := focusTracker.Start(ctx); err != nil {
+			logging.Warn("Failed to start focus tracking", "error", err)
+		} else {
+			logging.Info("Started focus tracking")
+		}
 
 		// Create a context for the TUI message handler
 		tuiCtx, tuiCancel := context.WithCancel(ctx)
